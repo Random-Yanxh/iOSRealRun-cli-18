@@ -6,21 +6,28 @@ import asyncio
 import main
 import threading
 
+from config import (
+    load_config,
+    load_route,
+    save_config,
+    save_route,
+    ensure_user_config,
+    ensure_user_route,
+)
+from paths import user_data_dir_, resource_path
+
 # from PIL import Image, ImageTk
 # import PIL
 
-# to be done:
-# run button
-# change location functionality
-# log window
-
 customtkinter.set_appearance_mode("dark")
+ensure_user_config()
+ensure_user_route()
 
 
 class TextboxFrame(customtkinter.CTkFrame):
     def __init__(self, master, title, route_file="route.txt"):
         super().__init__(master)
-        self.route_file = route_file
+        self.route_file = ensure_user_route()
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
@@ -37,13 +44,21 @@ class TextboxFrame(customtkinter.CTkFrame):
 
     def load_route_file(self):
         try:
-            with open(self.route_file, "r") as f:
+            route_path = user_data_dir_() / self.route_file
+            print(route_path)
+            if not route_path.exists():
+                default_route = resource_path(self.route_file)
+                route_path.write_text(
+                    default_route.read_text(encoding="utf-8"), encoding="utf-8"
+                )
+
+            with route_path.open("r", encoding="utf-8") as f:
                 content = f.read()
                 self.textbox.insert("0.0", content)
             print(f"Loaded {self.route_file} successfully.")
-        except FileNotFoundError:
-            print(f"Warning: {self.route_file} not found.")
-            self.textbox.insert("0.0", f"# {self.route_file} not found.")
+        except Exception as e:
+            print(f"Error loading {self.route_file}: {e}")
+            self.textbox.insert("0.0", f"# Error loading {self.route_file}: {e}")
 
     def get(self):
         return self.textbox.get("0.0", "end")
@@ -133,19 +148,27 @@ class ConfigFrame(customtkinter.CTkFrame):
         self.load_config()
 
     def load_config(self):
+        # 从用户目录加载 config.yaml
         try:
-            with open(self.config_file, "r") as f:
-                config_data = yaml.safe_load(f)
-                print(f"Loaded {self.config_file}: {config_data}")
+            config_path = user_data_dir_() / self.config_file
+            if not config_path.exists():  # 如果用户目录下没有文件，从打包目录加载
+                default_config = resource_path(self.config_file)
+                config_path.write_text(
+                    default_config.read_text(encoding="utf-8"), encoding="utf-8"
+                )
 
-                v_value = config_data.get("v", 3.0)
-                n_laps_value = config_data.get("n_laps", 8)
+            config_data = load_config()  # 使用 load_config 来加载用户的 config.yaml
 
-                self.v_slider.set(v_value)
-                self.update_slider_value_v(v_value)
+            print(f"Loaded {self.config_file}: {config_data}")
 
-                self.n_lap_slider.set(n_laps_value)
-                self.update_slider_value_n(n_laps_value)
+            v_value = config_data.get("v", 3.0)
+            n_laps_value = config_data.get("n_laps", 8)
+
+            self.v_slider.set(v_value)
+            self.update_slider_value_v(v_value)
+
+            self.n_lap_slider.set(n_laps_value)
+            self.update_slider_value_n(n_laps_value)
 
         except FileNotFoundError:
             print(f"Warning: {self.config_file} not found. Using defaults.")
@@ -154,6 +177,9 @@ class ConfigFrame(customtkinter.CTkFrame):
 
             self.n_lap_slider.set(8)
             self.update_slider_value_n(8)
+
+        except Exception as e:
+            print(f"Error loading {self.config_file}: {e}")
 
     def update_slider_value_v(self, value):
         self.v_label.configure(text=f"Velocity: {value:.1f} m/s")
@@ -200,16 +226,6 @@ class ActionsFrame(customtkinter.CTkFrame):
         self.save_button.grid(
             row=1, column=0, padx=10, pady=(10, 0), sticky="ew", columnspan=2
         )
-
-        self.change_location_button = customtkinter.CTkButton(
-            self,
-            text="Change Location (not implemented yet)",
-            command=self.change_location_callback,
-        )
-        self.change_location_button.grid(
-            row=2, column=0, padx=10, pady=(10, 0), sticky="ew", columnspan=2
-        )
-
         self.run_button = customtkinter.CTkButton(
             self, text="Run", command=self.run_callback
         )
@@ -229,7 +245,6 @@ class ActionsFrame(customtkinter.CTkFrame):
             row=5, column=0, padx=10, pady=(10, 0), sticky="ew", columnspan=2
         )
 
-
     def run_callback(self):
         print("Run button clicked. Starting main()...")
 
@@ -244,48 +259,30 @@ class ActionsFrame(customtkinter.CTkFrame):
 
     def stop_callback(self):
         print("Stop button clicked. Stopping main thread...")
-
         main.stop_event.set()
-
-        if self.run_thread is not None:
-            self.run_thread.join(timeout=5)
-            print("Main thread stopped.")
-
 
     def quit_callback(self):
         self.master.destroy()
 
-    def change_location_callback(self):
-        pass
-
     def save_callback(self):
         v_value = self.config_frame.get_v()
         n_laps_value = int(self.config_frame.get_n_lap())
-        route_path = "route.txt"
 
         config_data = {
             "v": round(v_value, 1),
             "n_laps": int(n_laps_value),
-            "routeConfig": route_path,
+            "routeConfig": "route.txt",
         }
 
         coords = self.textbox_frame.get().strip()
-        with open("config.yaml", "w") as f:
-            yaml.dump(config_data, f)
-
-        with open(route_path, "w") as f:
-            if coords:
-                f.write(coords)
-            else:
-                f.write("")
-
+        save_config(config_data)
+        save_route(coords if coords else "")
         print("Configuration saved:", config_data)
 
 
 class App(customtkinter.CTk):
     def __init__(self):
         super().__init__()
-
         self.title("iOSRealRun-18")
         self.geometry("800x600")
         self.grid_columnconfigure(0, weight=1, minsize=400)
@@ -316,6 +313,21 @@ class App(customtkinter.CTk):
         self.log_frame.grid(row=2, column=1, padx=(5, 10), pady=(5, 10), sticky="nsew")
         self.log_frame.redirect_logging()
 
+
 if __name__ == "__main__":
+    import sys, multiprocessing as mp
+
+    mp.freeze_support()
+
+    argv_str = " ".join(sys.argv)
+    is_mp_child = (
+        any(a.startswith("--multiprocessing") for a in sys.argv)
+        or "resource_tracker" in argv_str
+    )
+    is_helper_runner = "-m" in sys.argv and "pymobiledevice3" in sys.argv
+
+    if is_mp_child or is_helper_runner:
+        sys.exit(0)
+
     app = App()
     app.mainloop()
