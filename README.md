@@ -19,8 +19,8 @@
 
 ### 前置条件
 
-1. 系统是 `Windows` 或 `MacOS`（Linux请参考[此issue](https://github.com/BiancoChiu/iOSRealRun-cli-18/issues/4)）
-2. iPhone 或 iPad 系统版本大于等于 18（也许17的一些后期版本也可以用，未经测试）
+1. 系统是 `Windows`，`MacOS`，Linux均可（Linux请参考[此issue](https://github.com/BiancoChiu/iOSRealRun-cli-18/issues/4)）
+2. iPhone 或 iPad 系统版本大于等于 17（17/18/26均可运行）
 3. Windows 需要安装 iTunes
 4. 已安装 `Python3` 和 `pip3`
 5. **重要**: 只能有一台 iPhone 或 iPad 连接到电脑，否则会出问题

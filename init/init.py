@@ -15,8 +15,10 @@ def init():
             print("请以root权限运行")
             sys.exit(1)
     else:
-        print("仅支持macOS和Windows")
-        sys.exit(1)
+        print('Linux应该也可用，遇到问题请提issue')
+        if os.geteuid() != 0:
+            print("请以root权限运行")
+            sys.exit(1)
 
     # get lockdown client
     lockdown = connect.get_usbmux_lockdownclient()
